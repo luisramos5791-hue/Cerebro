@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Segundo cerebro</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#17323D">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2317323D'/%3E%3Ccircle cx='32' cy='32' r='12' fill='%2336B3C9'/%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#EEF2F4; --card:#FFFFFF; --ink:#17323D; --muted:#5E7480; --line:#D3DDE2;
+  --accent:#1F7A8C; --accent-ink:#FFFFFF; --danger:#B3403C;
+  --c-calidad:#1F7A8C; --c-aprendi:#4F8A34; --c-idea:#B7791F; --c-duda:#8A4FB0; --c-pendiente:#C0504D;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1D24; --card:#18303B; --ink:#E4EEF2; --muted:#93AAB5; --line:#2A4552;
+    --accent:#36B3C9; --accent-ink:#0F1D24; --danger:#E27570;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F1D24; --card:#18303B; --ink:#E4EEF2; --muted:#93AAB5; --line:#2A4552;
+  --accent:#36B3C9; --accent-ink:#0F1D24; --danger:#E27570;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Avenir Next","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;-webkit-text-size-adjust:100%}
+main{max-width:640px;margin:0 auto;padding:16px 16px 120px}
+header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:8px 0 14px}
+h1{font-size:1.5rem;margin:0;letter-spacing:-.01em}
+#contador{color:var(--muted);font-size:.9rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+textarea{width:100%;min-height:110px;resize:vertical;border:1px solid var(--line);border-radius:10px;padding:12px;font:inherit;color:var(--ink);background:var(--bg)}
+textarea:focus,button:focus-visible,select:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.tags{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.tags input{position:absolute;opacity:0;pointer-events:none}
+.tags label{border:1.5px solid var(--tc);color:var(--tc);border-radius:999px;padding:6px 14px;font-size:.92rem;cursor:pointer;user-select:none}
+.tags input:checked + label{background:var(--tc);color:#fff}
+.tags input:focus-visible + label{outline:3px solid var(--accent);outline-offset:2px}
+.row{display:flex;gap:10px}
+button{font:inherit;border:0;border-radius:10px;padding:12px 16px;cursor:pointer;color:var(--ink);background:var(--line)}
+button.primary{background:var(--accent);color:var(--accent-ink);font-weight:600}
+button.grow{flex:1}
+button.mini{padding:6px 10px;font-size:.85rem;background:transparent;border:1px solid var(--line);color:var(--muted)}
+button.mini.del{color:var(--danger)}
+.bar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:22px 0 10px}
+select{font:inherit;padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+.dia{margin:18px 0 8px;color:var(--muted);font-size:.9rem;font-weight:600}
+.nota{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--tc);border-radius:12px;padding:12px 14px;margin-bottom:10px}
+.nota.enviada{opacity:.6}
+.meta{display:flex;justify-content:space-between;gap:8px;color:var(--muted);font-size:.82rem;margin-bottom:4px}
+.meta b{color:var(--tc)}
+.texto{white-space:pre-wrap;overflow-wrap:anywhere}
+.acciones{display:flex;gap:8px;margin-top:10px}
+.vacio{text-align:center;color:var(--muted);padding:28px 8px}
+.dock{position:fixed;left:0;right:0;bottom:0;background:var(--bg);border-top:1px solid var(--line);padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px))}
+.dock .row{max-width:640px;margin:0 auto}
+#toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:.92rem;max-width:90%;text-align:center;opacity:0;pointer-events:none;transition:opacity .2s}
+#toast.on{opacity:1}
+@media (prefers-reduced-motion:reduce){#toast{transition:none}}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Segundo cerebro</h1>
+    <span id="contador" aria-live="polite"></span>
+  </header>
+
+  <section class="card" aria-label="Nueva nota">
+    <textarea id="texto" placeholder="¿Qué pasó, qué aprendiste o qué se te ocurrió?" aria-label="Texto de la nota"></textarea>
+    <div class="tags" id="tags" role="radiogroup" aria-label="Etiqueta"></div>
+    <div class="row">
+      <button id="btnMic" type="button" aria-label="Dictar por voz" hidden>Dictar</button>
+      <button id="btnGuardar" class="primary grow" type="button">Guardar nota</button>
+    </div>
+  </section>
+
+  <div class="bar">
+    <select id="filtro" aria-label="Filtrar notas"></select>
+    <div class="row">
+      <button class="mini" id="btnRespaldo" type="button">Respaldo</button>
+      <button class="mini" id="btnRestaurar" type="button">Restaurar</button>
+    </div>
+  </div>
+  <input type="file" id="archivo" accept="application/json" hidden>
+
+  <div id="lista"></div>
+</main>
+
+<div class="dock">
+  <div class="row">
+    <button id="btnCopiar" class="primary grow" type="button">Copiar notas sin enviar</button>
+  </div>
+</div>
+<div id="toast" role="status"></div>
+
+<script>
+(function(){
+  "use strict";
+  var KEY = "sc_notas_v1";
+  var TAGS = [
+    {id:"calidad", nombre:"Calidad", color:"var(--c-calidad)"},
+    {id:"aprendi", nombre:"Aprendí", color:"var(--c-aprendi)"},
+    {id:"idea", nombre:"Idea", color:"var(--c-idea)"},
+    {id:"duda", nombre:"Duda", color:"var(--c-duda)"},
+    {id:"pendiente", nombre:"Pendiente", color:"var(--c-pendiente)"}
+  ];
+  var notas = cargar();
+  var $ = function(id){ return document.getElementById(id); };
+
+  function cargar(){
+    try { var r = localStorage.getItem(KEY); return r ? JSON.parse(r) : []; }
+    catch(e){ return []; }
+  }
+  function guardar(){
+    try { localStorage.setItem(KEY, JSON.stringify(notas)); }
+    catch(e){ aviso("No se pudo guardar en este navegador. Haz un respaldo."); }
+  }
+  function tagInfo(id){
+    for (var i=0;i<TAGS.length;i++) if (TAGS[i].id===id) return TAGS[i];
+    return TAGS[0];
+  }
+  function aviso(msg){
+    var t = $("toast"); t.textContent = msg; t.classList.add("on");
+    clearTimeout(aviso.h); aviso.h = setTimeout(function(){ t.classList.remove("on"); }, 2600);
+  }
+  function p2(n){ return (n<10?"0":"")+n; }
+  function fechaDia(ts){
+    var d = new Date(ts);
+    return d.toLocaleDateString("es-PE",{weekday:"long", day:"numeric", month:"long"});
+  }
+  function hora(ts){ var d = new Date(ts); return p2(d.getHours())+":"+p2(d.getMinutes()); }
+  function fechaCorta(ts){ var d = new Date(ts); return p2(d.getDate())+"/"+p2(d.getMonth()+1)+" "+hora(ts); }
+
+  /* Etiquetas */
+  var cont = $("tags");
+  TAGS.forEach(function(t, i){
+    var inp = document.createElement("input");
+    inp.type = "radio"; inp.name = "tag"; inp.id = "tag_"+t.id; inp.value = t.id;
+    if (i===0) inp.checked = true;
+    var lab = document.createElement("label");
+    lab.htmlFor = inp.id; lab.textContent = t.nombre; lab.style.setProperty("--tc", t.color);
+    cont.appendChild(inp); cont.appendChild(lab);
+  });
+  function tagElegido(){
+    var el = document.querySelector('input[name="tag"]:checked');
+    return el ? el.value : "calidad";
+  }
+
+  /* Filtro */
+  var filtro = $("filtro");
+  function llenarFiltro(){
+    var opts = [["sin_enviar","Sin enviar"],["todas","Todas"]].concat(TAGS.map(function(t){ return [t.id,t.nombre]; }));
+    var actual = filtro.value || "sin_enviar";
+    filtro.textContent = "";
+    opts.forEach(function(o){
+      var op = document.createElement("option"); op.value = o[0]; op.textContent = o[1]; filtro.appendChild(op);
+    });
+    filtro.value = actual;
+  }
+  llenarFiltro();
+  filtro.addEventListener("change", pintar);
+
+  /* Guardar nota */
+  $("btnGuardar").addEventListener("click", function(){
+    var ta = $("texto"); var txt = ta.value.trim();
+    if (!txt){ aviso("Escribe algo antes de guardar."); ta.focus(); return; }
+    notas.unshift({id: Date.now()+"_"+Math.random().toString(36).slice(2,6), t: Date.now(), tag: tagElegido(), text: txt, sent: false});
+    guardar(); ta.value = ""; ta.focus(); pintar(); aviso("Nota guardada.");
+  });
+
+  /* Pintar lista */
+  function pintar(){
+    var lista = $("lista"); lista.textContent = "";
+    var sinEnviar = notas.filter(function(n){ return !n.sent; }).length;
+    $("contador").textContent = sinEnviar + (sinEnviar===1 ? " sin enviar" : " sin enviar");
+    var f = filtro.value;
+    var vis = notas.filter(function(n){
+      if (f==="todas") return true;
+      if (f==="sin_enviar") return !n.sent;
+      return n.tag===f;
+    });
+    if (!vis.length){
+      var v = document.createElement("div"); v.className = "vacio";
+      v.textContent = notas.length ? "No hay notas con este filtro." : "Aún no tienes notas. Escribe la primera arriba.";
+      lista.appendChild(v); return;
+    }
+    var diaActual = "";
+    vis.forEach(function(n){
+      var dia = fechaDia(n.t);
+      if (dia!==diaActual){
+        diaActual = dia;
+        var h = document.createElement("div"); h.className = "dia"; h.textContent = dia; lista.appendChild(h);
+      }
+      var ti = tagInfo(n.tag);
+      var box = document.createElement("article");
+      box.className = "nota" + (n.sent ? " enviada" : "");
+      box.style.setProperty("--tc", ti.color);
+      var meta = document.createElement("div"); meta.className = "meta";
+      var b = document.createElement("b"); b.textContent = ti.nombre;
+      var s = document.createElement("span"); s.textContent = hora(n.t) + (n.sent ? " · enviada" : "");
+      meta.appendChild(b); meta.appendChild(s);
+      var tx = document.createElement("div"); tx.className = "texto"; tx.textContent = n.text;
+      var ac = document.createElement("div"); ac.className = "acciones";
+      var bEnv = document.createElement("button"); bEnv.type="button"; bEnv.className="mini";
+      bEnv.textContent = n.sent ? "Marcar sin enviar" : "Marcar enviada";
+      bEnv.addEventListener("click", function(){ n.sent = !n.sent; guardar(); pintar(); });
+      var bEd = document.createElement("button"); bEd.type="button"; bEd.className="mini"; bEd.textContent="Editar";
+      bEd.addEventListener("click", function(){
+        var nuevo = window.prompt("Editar nota", n.text);
+        if (nuevo!==null && nuevo.trim()){ n.text = nuevo.trim(); n.sent = false; guardar(); pintar(); }
+      });
+      var bDel = document.createElement("button"); bDel.type="button"; bDel.className="mini del"; bDel.textContent="Borrar";
+      bDel.addEventListener("click", function(){
+        if (window.confirm("¿Borrar esta nota?")){
+          notas = notas.filter(function(x){ return x.id!==n.id; }); guardar(); pintar();
+        }
+      });
+      ac.appendChild(bEnv); ac.appendChild(bEd); ac.appendChild(bDel);
+      box.appendChild(meta); box.appendChild(tx); box.appendChild(ac);
+      lista.appendChild(box);
+    });
+  }
+
+  /* Copiar en lote */
+  function copiarTexto(txt){
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      return navigator.clipboard.writeText(txt);
+    }
+    return new Promise(function(ok, no){
+      var ta = document.createElement("textarea"); ta.value = txt; ta.style.position="fixed"; ta.style.opacity="0";
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy") ? ok() : no(); } catch(e){ no(e); }
+      document.body.removeChild(ta);
+    });
+  }
+  $("btnCopiar").addEventListener("click", function(){
+    var pend = notas.filter(function(n){ return !n.sent; }).slice().reverse();
+    if (!pend.length){ aviso("No hay notas sin enviar."); return; }
+    var out = "Estas son mis notas de segundo cerebro (" + pend.length + "). Conviértelas en fichas de conocimiento (problema, causa, solución, lección), agrupa por tema, señala qué me falta aprender y dime qué pendientes siguen abiertos.\n\n";
+    pend.forEach(function(n){
+      out += "[" + tagInfo(n.tag).nombre + "] " + fechaCorta(n.t) + "\n" + n.text + "\n\n";
+    });
+    copiarTexto(out.trim()).then(function(){
+      pend.forEach(function(n){ n.sent = true; });
+      guardar(); pintar();
+      aviso("Copiadas " + pend.length + " notas. Pégalas en Claude.");
+    }, function(){ aviso("No se pudo copiar. Prueba de nuevo."); });
+  });
+
+  /* Respaldo y restauración */
+  $("btnRespaldo").addEventListener("click", function(){
+    var blob = new Blob([JSON.stringify(notas, null, 1)], {type:"application/json"});
+    var a = document.createElement("a"); var d = new Date();
+    a.href = URL.createObjectURL(blob);
+    a.download = "segundo_cerebro_" + d.getFullYear() + p2(d.getMonth()+1) + p2(d.getDate()) + ".json";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
+    aviso("Respaldo descargado.");
+  });
+  $("btnRestaurar").addEventListener("click", function(){ $("archivo").click(); });
+  $("archivo").addEventListener("change", function(e){
+    var fl = e.target.files[0]; if (!fl) return;
+    var rd = new FileReader();
+    rd.onload = function(){
+      try {
+        var data = JSON.parse(rd.result);
+        if (!Array.isArray(data)) throw new Error("formato");
+        var ids = {}; notas.forEach(function(n){ ids[n.id] = 1; });
+        var nuevas = data.filter(function(n){ return n && n.id && n.text && !ids[n.id]; });
+        notas = notas.concat(nuevas).sort(function(a,b){ return b.t - a.t; });
+        guardar(); pintar(); aviso("Restauradas " + nuevas.length + " notas.");
+      } catch(err){ aviso("El archivo no es un respaldo válido."); }
+    };
+    rd.readAsText(fl); e.target.value = "";
+  });
+
+  /* Dictado por voz (necesita internet en la mayoría de navegadores) */
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (SR){
+    var btn = $("btnMic"); btn.hidden = false;
+    var rec = null, escuchando = false;
+    btn.addEventListener("click", function(){
+      if (escuchando && rec){ rec.stop(); return; }
+      rec = new SR(); rec.lang = "es-PE"; rec.interimResults = false; rec.continuous = true;
+      rec.onresult = function(ev){
+        var ta = $("texto");
+        for (var i = ev.resultIndex; i < ev.results.length; i++){
+          if (ev.results[i].isFinal) ta.value += (ta.value && !/\s$/.test(ta.value) ? " " : "") + ev.results[i][0].transcript.trim();
+        }
+      };
+      rec.onend = function(){ escuchando = false; btn.textContent = "Dictar"; };
+      rec.onerror = function(){ aviso("No se pudo dictar. Revisa el permiso del micrófono y tu conexión."); };
+      rec.start(); escuchando = true; btn.textContent = "Detener";
+    });
+  }
+
+  /* Instalación como PWA: manifiesto en línea + service worker opcional */
+  try {
+    var manifest = {
+      name:"Segundo cerebro", short_name:"Cerebro", lang:"es",
+      start_url: location.pathname, scope: location.pathname.replace(/[^\/]*$/, ""),
+      display:"standalone", background_color:"#17323D", theme_color:"#17323D",
+      icons:[{src:"data:image/svg+xml," + encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='#17323D'/><circle cx='32' cy='32' r='12' fill='#36B3C9'/></svg>"), sizes:"any", type:"image/svg+xml", purpose:"any"}]
+    };
+    var l = document.createElement("link"); l.rel = "manifest";
+    l.href = "data:application/manifest+json," + encodeURIComponent(JSON.stringify(manifest));
+    document.head.appendChild(l);
+  } catch(e){}
+  if ("serviceWorker" in navigator && location.protocol === "https:"){
+    navigator.serviceWorker.register("sw.js").catch(function(){});
+  }
+
+  pintar();
+})();
+</script>
+</body>
+</html>
