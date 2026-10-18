@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Cerebro estelar</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#06122B">
+<style>
+:root{--ink:#E8F1FF;--mut:#8FA6C9;--pn:rgba(8,22,52,.92);--ln:#2A4678;--ac:#4FD1FF;box-sizing:border-box}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:radial-gradient(ellipse at 50% 45%,#0F3270 0%,#081B44 55%,#040C22 100%);color:var(--ink);font:15px/1.5 "Avenir Next","Segoe UI",Roboto,Arial,sans-serif;overflow:hidden}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:manipulation}
+header{position:fixed;top:0;left:0;right:0;padding:calc(10px + env(safe-area-inset-top,0px)) 14px 10px;display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;pointer-events:none}
+header>*{pointer-events:auto}
+h1{font-size:1.15rem;margin:0;letter-spacing:.01em}
+#tag{font-size:.78rem;color:#06122B;background:#FFD84A;border-radius:999px;padding:2px 10px}
+.bt{display:flex;flex-wrap:wrap;gap:6px;margin-left:auto}
+button{font:inherit;font-size:.88rem;color:var(--ink);background:rgba(20,50,100,.65);border:1px solid var(--ln);border-radius:10px;padding:7px 12px;cursor:pointer}
+button:hover{border-color:var(--ac)}
+button:focus-visible,textarea:focus-visible{outline:3px solid var(--ac);outline-offset:2px}
+button.pri{background:var(--ac);color:#06122B;border-color:var(--ac);font-weight:600}
+#leg{position:fixed;left:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));display:flex;flex-wrap:wrap;gap:6px;max-width:60%}
+#leg button{padding:4px 10px;font-size:.8rem;border-radius:999px;border-color:var(--c);color:var(--c);background:rgba(6,18,43,.6)}
+#leg button.off{opacity:.35}
+#pn{position:fixed;right:12px;top:70px;width:320px;max-height:calc(100% - 150px);overflow:auto;background:var(--pn);border:1px solid var(--ln);border-radius:14px;padding:14px;backdrop-filter:blur(6px)}
+#pn[hidden]{display:none}
+#pn h2{font-size:1.1rem;margin:0 0 4px}
+#pn .m{color:var(--mut);font-size:.82rem;margin-bottom:8px}
+#pn p{margin:0 0 10px;overflow-wrap:anywhere}
+#pn .lk{display:flex;flex-wrap:wrap;gap:6px}
+#pn .x{float:right;padding:2px 9px}
+@media (max-width:640px){#pn{left:8px;right:8px;top:auto;bottom:8px;width:auto;max-height:46%}#leg{display:none}}
+dialog{background:#0A1B3F;color:var(--ink);border:1px solid var(--ln);border-radius:14px;width:min(560px,94vw);padding:16px}
+dialog::backdrop{background:rgba(2,8,24,.7)}
+textarea{width:100%;min-height:200px;background:#06122B;color:var(--ink);border:1px solid var(--ln);border-radius:10px;padding:10px;font:12.5px/1.4 ui-monospace,Consolas,monospace}
+dialog p{margin:0 0 10px;color:var(--mut);font-size:.88rem}
+.rw{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+#toast{position:fixed;left:50%;bottom:calc(70px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:#E8F1FF;color:#06122B;padding:9px 16px;border-radius:10px;font-size:.9rem;max-width:90%;text-align:center;opacity:0;pointer-events:none;transition:opacity .2s}
+#toast.on{opacity:1}
+</style>
+</head>
+<body>
+<canvas id="cv" aria-label="Cerebro estelar con tus ideas conectadas"></canvas>
+<header>
+  <h1>Cerebro estelar</h1><span id="tag" hidden>Modo demo</span>
+  <div class="bt">
+    <button id="bImp" class="pri" type="button">Importar sesión</button>
+    <button id="bResp" type="button">Respaldo</button>
+    <button id="bRest" type="button">Restaurar</button>
+    <button id="bDemo" type="button" hidden>Vaciar demo</button>
+  </div>
+</header>
+<div id="leg"></div>
+<aside id="pn" hidden></aside>
+<input type="file" id="fl" accept="application/json" hidden>
+<dialog id="dlg">
+  <p><b>Pega aquí el JSON</b> que te devuelve Claude al cerrar la sesión. La araña lo teje en tu cerebro. El ejemplo de abajo sirve para ver cómo teje.</p>
+  <textarea id="ta" spellcheck="false" aria-label="JSON de la sesión"></textarea>
+  <div class="rw">
+    <button id="bTejer" class="pri" type="button">Tejer en el cerebro</button>
+    <button id="bInst" type="button">Copiar instrucción para Claude</button>
+    <button id="bCerrar" type="button">Cerrar</button>
+  </div>
+</dialog>
+<div id="toast" role="status"></div>
+
+<script>
+(function(){
+"use strict";
+var $=function(i){return document.getElementById(i)},cv=$("cv"),g=cv.getContext("2d");
+var KEY="ce_v1",RM=matchMedia("(prefers-reduced-motion:reduce)").matches;
+var PAL=["#4FD1FF","#FFD84A","#FF5FA2","#9B8CFF","#7DFFB2","#FF9F5A"];
+var TEMAS={calidad:["Calidad","#4FD1FF"],proc:["Procesos","#FFD84A"],dev:["Desarrollo","#FF5FA2"],com:["Comunicación","#9B8CFF"],apr:["Aprendizaje","#7DFFB2"]};
+var W,H,S,CX,CY,DPR=1,N=[],E=[],M=[],ML=[],BG=[],sel=null,hov=null,off={},tasks=[],sp={x:0,y:0,a:0,ph:0,tg:null,w:0},last=0;
+
+var DEMO={nodos:[
+{id:"insp",titulo:"Inspección y criterios",tema:"calidad",resumen:"Definir qué se revisa, cómo y con qué criterio de aceptación.",fecha:"2026-10-01",peso:4,x:-.38,y:-.36},
+{id:"mues",titulo:"Muestreo y pruebas",tema:"calidad",resumen:"Elegir muestras representativas y ensayos que sirvan para decidir.",fecha:"2026-10-01",peso:5,x:-.1,y:-.15},
+{id:"causa",titulo:"Análisis de causa raíz",tema:"calidad",resumen:"Pasar del síntoma a la causa antes de proponer una solución.",fecha:"2026-10-02",peso:4,x:-.52,y:-.02},
+{id:"doc",titulo:"Documentar hallazgos",tema:"proc",resumen:"Dejar evidencia clara: qué se vio, dónde, cuándo y con qué prueba.",fecha:"2026-10-02",peso:4,x:.12,y:-.47},
+{id:"dato",titulo:"Datos y registros",tema:"proc",resumen:"Registrar de forma consistente para poder comparar y aprender.",fecha:"2026-10-05",peso:3,x:-.76,y:.14},
+{id:"mejora",titulo:"Mejora continua",tema:"proc",resumen:"Convertir cada problema en un cambio pequeño y medible.",fecha:"2026-10-05",peso:3,x:-.55,y:.36},
+{id:"app",titulo:"Apps web simples",tema:"dev",resumen:"Herramientas ligeras que resuelven un problema concreto de trabajo.",fecha:"2026-10-03",peso:5,x:.42,y:-.05},
+{id:"js",titulo:"HTML, CSS y JS puro",tema:"dev",resumen:"Base técnica sin frameworks: un archivo, fácil de mover y mantener.",fecha:"2026-10-03",peso:3,x:.72,y:-.22},
+{id:"off",titulo:"Apps sin internet",tema:"dev",resumen:"Guardar local y sincronizar al reconectar.",fecha:"2026-10-04",peso:3,x:.62,y:.17},
+{id:"com",titulo:"Comunicar con claridad",tema:"com",resumen:"Decir lo importante primero y respaldarlo con evidencia.",fecha:"2026-10-05",peso:3,x:-.28,y:.3},
+{id:"rep",titulo:"Reportes que se entienden",tema:"com",resumen:"Un reporte útil responde qué pasó, qué importa y qué sigue.",fecha:"2026-10-05",peso:2,x:-.82,y:-.3},
+{id:"cere",titulo:"Segundo cerebro",tema:"apr",resumen:"Capturar, conversar y conectar lo que voy aprendiendo.",fecha:"2026-10-18",peso:4,x:.1,y:.2},
+{id:"voz",titulo:"Diálogo por voz",tema:"apr",resumen:"Hablar con Claude en el camino y resumir al cerrar la sesión.",fecha:"2026-10-18",peso:2,x:.3,y:.42}
+],enlaces:[["insp","mues"],["mues","causa"],["mues","doc"],["causa","doc"],["insp","causa"],["app","js"],["app","off"],["app","dato"],["app","doc"],["dato","mues"],["mejora","causa"],["mejora","dato"],["com","doc"],["rep","com"],["rep","dato"],["cere","voz"],["cere","app"],["cere","insp"]]};
+var EJEMPLO='{"nodos":[{"id":"ruta","titulo":"Ideas en el camino","tema":"apr","resumen":"Ejemplo: lo conversado por voz se resume y se teje aquí.","fecha":"2026-10-18","peso":3},{"id":"check","titulo":"Checklist de revisión","tema":"calidad","resumen":"Ejemplo: pasos fijos para revisar un lote antes de decidir.","fecha":"2026-10-18","peso":3}],"enlaces":[["ruta","cere"],["ruta","check"],["check","insp"]]}';
+
+function ins(x,y){return Math.pow(x/.95,2)+Math.pow((y+.05)/.68,2)<1||Math.pow((x+.15)/.6,2)+Math.pow((y-.5)/.3,2)<1||Math.pow((x-.5)/.32,2)+Math.pow((y-.62)/.2,2)<1||(x>.1&&x<.3&&y>.5&&y<.95)}
+function P(x,y){return[CX+x*S,CY+y*S]}
+function byId(i){for(var k=0;k<N.length;k++)if(N[k].id==i)return N[k];return null}
+function col(t){if(TEMAS[t])return TEMAS[t][1];var h=0;for(var i=0;i<t.length;i++)h=(h*31+t.charCodeAt(i))>>>0;return PAL[h%PAL.length]}
+function nom(t){return TEMAS[t]?TEMAS[t][0]:t.charAt(0).toUpperCase()+t.slice(1)}
+function toast(m){var t=$("toast");t.textContent=m;t.classList.add("on");clearTimeout(toast.h);toast.h=setTimeout(function(){t.classList.remove("on")},2800)}
+
+/* malla del cerebro */
+(function(){var i,x,y;while(M.length<340){x=Math.random()*2-1;y=Math.random()*1.8-.8;if(ins(x,y))M.push([x,y])}
+for(i=0;i<M.length;i++){var d=[];for(var j=0;j<M.length;j++)if(j!=i)d.push([Math.hypot(M[i][0]-M[j][0],M[i][1]-M[j][1]),j]);d.sort(function(a,b){return a[0]-b[0]});for(var k=0;k<3;k++)if(d[k][0]<.2)ML.push([i,d[k][1]])}
+for(i=0;i<110;i++)BG.push([Math.random(),Math.random(),Math.random()])})();
+
+function place(n){if(n.x!=null)return;var nb=[],sm=[],i;
+for(i=0;i<E.length;i++){var e=E[i];if(e.a==n.id||e.b==n.id){var q=byId(e.a==n.id?e.b:e.a);if(q&&q!==n&&q.x!=null)nb.push(q)}}
+for(i=0;i<N.length;i++)if(N[i]!==n&&N[i].tema==n.tema&&N[i].x!=null)sm.push(N[i]);
+var ref=nb.length?nb:sm,bx=0,by=-.1;if(ref.length){bx=ref.reduce(function(s,q){return s+q.x},0)/ref.length;by=ref.reduce(function(s,q){return s+q.y},0)/ref.length}
+for(i=0;i<80;i++){var x=bx+(Math.random()-.5)*.55,y=by+(Math.random()-.5)*.55;
+if(ins(x,y)&&N.every(function(q){return q===n||q.x==null||Math.hypot(q.x-x,q.y-y)>.13})){n.x=x;n.y=y;return}}
+do{n.x=Math.random()*1.6-.8;n.y=Math.random()*1.2-.5}while(!ins(n.x,n.y))}
+
+function merge(d,weave,demo){var nuevos=[],now=performance.now();
+(d.nodos||[]).forEach(function(o){if(!o||!o.id||!o.titulo)return;var n=byId(o.id);
+if(n){n.titulo=o.titulo;n.tema=o.tema||n.tema;n.resumen=o.resumen||n.resumen;n.fecha=o.fecha||n.fecha;if(o.peso)n.peso=Math.min(5,Math.max(1,+o.peso));return}
+n={id:String(o.id),titulo:String(o.titulo),tema:String(o.tema||"otro").toLowerCase(),resumen:o.resumen||"",fecha:o.fecha||"",peso:Math.min(5,Math.max(1,+o.peso||2)),x:o.x,y:o.y,born:(weave&&!RM)?now+300:-1e9,demo:!!(demo||o.demo)};
+N.push(n);nuevos.push(n)});
+(d.enlaces||[]).forEach(function(l){var a=String(l[0]),b=String(l[1]);if(a==b||!byId(a)||!byId(b))return;
+if(E.some(function(e){return(e.a==a&&e.b==b)||(e.a==b&&e.b==a)}))return;
+var e={a:a,b:b,p:(weave&&!RM)?0:1,ph:0};E.push(e);if(e.p<1)tasks.push(e)});
+nuevos.forEach(place);return nuevos.length}
+
+function save(){try{localStorage.setItem(KEY,JSON.stringify({nodos:N,enlaces:E.map(function(e){return[e.a,e.b]})}))}catch(e){toast("No se pudo guardar aquí. Haz un respaldo.")}}
+function load(){try{var r=localStorage.getItem(KEY);if(r){var d=JSON.parse(r);merge(d,false,false);return true}}catch(e){}return false}
+function refresh(){var dm=N.some(function(n){return n.demo});$("tag").hidden=!dm;$("bDemo").hidden=!dm;
+var lg=$("leg");lg.textContent="";var seen={};N.forEach(function(n){if(seen[n.tema])return;seen[n.tema]=1;var b=document.createElement("button");b.type="button";b.textContent=nom(n.tema);b.style.setProperty("--c",col(n.tema));if(off[n.tema])b.className="off";b.onclick=function(){off[n.tema]=!off[n.tema];refresh()};lg.appendChild(b)})}
+
+/* panel */
+function panel(){var p=$("pn");if(!sel){p.hidden=true;return}p.hidden=false;p.textContent="";
+var x=document.createElement("button");x.className="x";x.type="button";x.textContent="Cerrar";x.onclick=function(){sel=null;panel()};
+var h=document.createElement("h2");h.textContent=sel.titulo;
+var m=document.createElement("div");m.className="m";m.style.color=col(sel.tema);m.textContent=nom(sel.tema)+(sel.fecha?" · "+sel.fecha:"");
+var t=document.createElement("p");t.textContent=sel.resumen||"Sin resumen todavía.";
+p.appendChild(x);p.appendChild(h);p.appendChild(m);p.appendChild(t);
+var ids=[];E.forEach(function(e){if(e.a==sel.id)ids.push(e.b);else if(e.b==sel.id)ids.push(e.a)});
+if(ids.length){var l=document.createElement("div");l.className="m";l.textContent="Conectada con";p.appendChild(l);var w=document.createElement("div");w.className="lk";
+ids.forEach(function(i){var q=byId(i);if(!q)return;var b=document.createElement("button");b.type="button";b.textContent=q.titulo;b.style.borderColor=col(q.tema);b.onclick=function(){sel=q;panel()};w.appendChild(b)});p.appendChild(w)}}
+
+/* tamaño y bucle */
+function size(){DPR=window.devicePixelRatio||1;W=innerWidth;H=innerHeight;cv.width=W*DPR;cv.height=H*DPR;S=Math.min(W/2.1,H/1.8);CX=W/2;CY=H/2+Math.min(30,H*.04)}
+addEventListener("resize",size);size();
+
+function pick(cx,cy){var best=null,bd=1e9;N.forEach(function(n){if(off[n.tema])return;var p=P(n.x,n.y),d=Math.hypot(p[0]-cx,p[1]-cy);if(d<Math.max(22,4+n.peso*2+10)&&d<bd){bd=d;best=n}});return best}
+cv.addEventListener("pointermove",function(e){hov=pick(e.clientX,e.clientY);cv.style.cursor=hov?"pointer":"default"});
+cv.addEventListener("pointerdown",function(e){var n=pick(e.clientX,e.clientY);if(n||sel){sel=n;panel()}});
+
+function update(dt){var A,B,e;
+if(tasks.length){e=tasks[0];A=byId(e.a);B=byId(e.b);var a=P(A.x,A.y),b=P(B.x,B.y);
+if(!e.ph){var d=Math.hypot(a[0]-sp.x,a[1]-sp.y);if(d<3)e.ph=1;else{var v=Math.min(d,520*dt);sp.a=Math.atan2(a[1]-sp.y,a[0]-sp.x);sp.x+=Math.cos(sp.a)*v;sp.y+=Math.sin(sp.a)*v;sp.ph+=dt*30}}
+else{e.p=Math.min(1,e.p+dt*1.3);sp.x=a[0]+(b[0]-a[0])*e.p;sp.y=a[1]+(b[1]-a[1])*e.p;sp.a=Math.atan2(b[1]-a[1],b[0]-a[0]);sp.ph+=dt*30;if(e.p>=1)tasks.shift()}return}
+if(!N.length)return;if(sp.w>0){sp.w-=dt;return}
+if(!sp.tg||sp.tg.dead){sp.tg=N[Math.floor(Math.random()*N.length)]}
+var t=P(sp.tg.x,sp.tg.y),dd=Math.hypot(t[0]-sp.x,t[1]-sp.y);
+if(dd<3){sp.tg=null;sp.w=1.5+Math.random()*3}else{var s=Math.min(dd,55*dt);sp.a=Math.atan2(t[1]-sp.y,t[0]-sp.x);sp.x+=Math.cos(sp.a)*s;sp.y+=Math.sin(sp.a)*s;sp.ph+=dt*8}}
+
+function spider(){g.save();g.translate(sp.x,sp.y);g.rotate(sp.a);g.strokeStyle="#EAF3FF";g.lineWidth=1.2;g.globalAlpha=1;
+for(var s=-1;s<=1;s+=2)for(var i=0;i<4;i++){var b=(i-1.5)*.55,w=Math.sin(sp.ph+i*1.7+(s>0?0:1.5))*.28,a1=b+w;
+var x1=Math.cos(a1)*7,y1=s*(5+Math.abs(Math.sin(b))*4),x2=x1+Math.cos(a1)*6,y2=y1+s*6;g.beginPath();g.moveTo(0,0);g.lineTo(x1*.6,y1*.7);g.lineTo(x2*.8,y2);g.stroke()}
+g.fillStyle="#EAF3FF";g.beginPath();g.ellipse(-2,0,6,4.4,0,0,7);g.fill();g.beginPath();g.arc(5,0,3,0,7);g.fill();
+g.fillStyle="#FF5FA2";g.beginPath();g.arc(-3,0,1.6,0,7);g.fill();g.restore()}
+
+function draw(now){var t=RM?0:now/1000,i,focus=sel||hov,conn={};
+g.setTransform(DPR,0,0,DPR,0,0);g.clearRect(0,0,W,H);
+g.fillStyle="#CFE3FF";BG.forEach(function(s){g.globalAlpha=.25+.2*Math.sin(t*1.2+s[2]*9);g.fillRect(s[0]*W,s[1]*H,1.3,1.3)});
+g.strokeStyle="#7FB4FF";g.lineWidth=.6;g.globalAlpha=.11;g.beginPath();
+ML.forEach(function(l){var a=P(M[l[0]][0],M[l[0]][1]),b=P(M[l[1]][0],M[l[1]][1]);g.moveTo(a[0],a[1]);g.lineTo(b[0],b[1])});g.stroke();
+g.fillStyle="#9FD0FF";M.forEach(function(m,k){var p=P(m[0],m[1]);g.globalAlpha=.3+.3*Math.sin(t*1.5+k);g.beginPath();g.arc(p[0],p[1],1.1,0,7);g.fill()});
+if(focus){conn[focus.id]=1;E.forEach(function(e){if(e.a==focus.id)conn[e.b]=1;else if(e.b==focus.id)conn[e.a]=1})}
+E.forEach(function(e){var A=byId(e.a),B=byId(e.b);if(!A||!B||e.p<=0)return;var a=P(A.x,A.y),b=P(B.x,B.y),hot=focus&&(e.a==focus.id||e.b==focus.id);
+var dim=off[A.tema]||off[B.tema]||(focus&&!hot);g.globalAlpha=dim?.08:(hot?1:.55);g.lineWidth=hot?2:1;
+var gr=g.createLinearGradient(a[0],a[1],b[0],b[1]);gr.addColorStop(0,col(A.tema));gr.addColorStop(1,col(B.tema));g.strokeStyle=gr;
+g.beginPath();g.moveTo(a[0],a[1]);g.lineTo(a[0]+(b[0]-a[0])*e.p,a[1]+(b[1]-a[1])*e.p);g.stroke()});
+N.forEach(function(n){var k=Math.max(0,Math.min(1,(now-n.born)/700));if(k<=0)return;k=1-Math.pow(1-k,3);
+var p=P(n.x,n.y),r=(4+n.peso*1.6)*k,c=col(n.tema),dim=off[n.tema]||(focus&&!conn[n.id]);
+g.globalAlpha=dim?.2:1;var gr=g.createRadialGradient(p[0],p[1],0,p[0],p[1],r*4);gr.addColorStop(0,c+"AA");gr.addColorStop(1,c+"00");
+g.fillStyle=gr;g.beginPath();g.arc(p[0],p[1],r*4,0,7);g.fill();
+g.fillStyle="#fff";g.beginPath();g.arc(p[0],p[1],r*.55,0,7);g.fill();g.strokeStyle=c;g.lineWidth=n===sel?3:1.5;g.beginPath();g.arc(p[0],p[1],r,0,7);g.stroke();
+if(!dim&&(N.length<=30||n===sel||n===hov||(focus&&conn[n.id]))){g.font="12px system-ui,sans-serif";g.textAlign="center";g.lineWidth=3;g.strokeStyle="#06122B";g.fillStyle="#E8F1FF";
+g.strokeText(n.titulo,p[0],p[1]+r+16);g.fillText(n.titulo,p[0],p[1]+r+16)}});
+g.globalAlpha=1;spider()}
+
+function loop(now){var dt=Math.min(.05,(now-last)/1000||0);last=now;update(dt);draw(now);requestAnimationFrame(loop)}
+
+/* importar, copiar, respaldo */
+function copiar(txt){if(navigator.clipboard&&navigator.clipboard.writeText)return navigator.clipboard.writeText(txt);
+return new Promise(function(ok,no){var a=document.createElement("textarea");a.value=txt;a.style.position="fixed";a.style.opacity="0";document.body.appendChild(a);a.select();try{document.execCommand("copy")?ok():no()}catch(e){no(e)}document.body.removeChild(a)})}
+function inst(){return'Cierra la sesión y devuélveme SOLO un JSON, sin explicación, para mi cerebro estelar, con este formato: {"nodos":[{"id":"clave-corta","titulo":"...","tema":"calidad|proc|dev|com|apr|otro","resumen":"1 a 3 frases","fecha":"AAAA-MM-DD","peso":3}],"enlaces":[["id1","id2"]]}. Para conectar con ideas anteriores usa estos id existentes: '+N.map(function(n){return n.id+" = "+n.titulo}).join("; ")+"."}
+$("bImp").onclick=function(){var ta=$("ta");if(!ta.value&&N.some(function(n){return n.demo}))ta.value=EJEMPLO;$("dlg").showModal()};
+$("bCerrar").onclick=function(){$("dlg").close()};
+$("bInst").onclick=function(){copiar(inst()).then(function(){toast("Instrucción copiada. Pégala en Claude al cerrar la sesión.")},function(){toast("No se pudo copiar.")})};
+$("bTejer").onclick=function(){var s=$("ta").value.replace(/```json|```/g,"").trim(),a=s.indexOf("{"),b=s.lastIndexOf("}");
+try{var d=JSON.parse(s.slice(a,b+1));var c=merge(d,true,false);save();refresh();$("dlg").close();$("ta").value="";toast(c?"La araña teje "+c+(c==1?" idea nueva.":" ideas nuevas."):"Conexiones actualizadas.")}
+catch(e){toast("No pude leer ese JSON. Pídele a Claude que lo devuelva de nuevo.")}};
+$("bDemo").onclick=function(){if(!confirm("¿Quitar los nodos de ejemplo? Tus ideas importadas se quedan."))return;
+N=N.filter(function(n){return!n.demo});var ids={};N.forEach(function(n){ids[n.id]=1});E=E.filter(function(e){return ids[e.a]&&ids[e.b]});tasks=[];sel=null;sp.tg=null;save();refresh();panel()};
+$("bResp").onclick=function(){var b=new Blob([JSON.stringify({nodos:N,enlaces:E.map(function(e){return[e.a,e.b]})},null,1)],{type:"application/json"}),a=document.createElement("a"),d=new Date();
+a.href=URL.createObjectURL(b);a.download="cerebro_estelar_"+d.getFullYear()+("0"+(d.getMonth()+1)).slice(-2)+("0"+d.getDate()).slice(-2)+".json";document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(function(){URL.revokeObjectURL(a.href)},1000);toast("Respaldo descargado.")};
+$("bRest").onclick=function(){$("fl").click()};
+$("fl").onchange=function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(){try{var c=merge(JSON.parse(r.result),true,false);save();refresh();toast("Restauradas "+c+" ideas.")}catch(x){toast("El archivo no es un respaldo válido.")}};r.readAsText(f);e.target.value=""};
+
+if(!load()){merge(DEMO,false,true);save()}
+refresh();requestAnimationFrame(function(n){last=n;var f=N[0];sp.x=f?P(f.x,f.y)[0]:CX;sp.y=f?P(f.x,f.y)[1]:CY;requestAnimationFrame(loop)});
+})();
+</script>
+</body>
+</html>
