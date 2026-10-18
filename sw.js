@@ -1,8 +1,8 @@
-var CACHE = "segundo-cerebro-v1";
+var CACHE = "segundo-cerebro-v2";
 self.addEventListener("install", function (e) {
   e.waitUntil(
     caches.open(CACHE).then(function (c) {
-      return c.addAll(["./", "./segundo_cerebro.html"]);
+      return c.addAll(["./", "./index.html"]);
     })
   );
   self.skipWaiting();
@@ -24,6 +24,6 @@ self.addEventListener("fetch", function (e) {
         caches.open(CACHE).then(function (c) { c.put(e.request, copia); });
         return r;
       })
-      .catch(function () { return caches.match(e.request).then(function (m) { return m || caches.match("./segundo_cerebro.html"); }); })
+      .catch(function () { return caches.match(e.request).then(function (m) { return m || caches.match("./index.html"); }); })
   );
 });
